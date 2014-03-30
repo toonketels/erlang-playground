@@ -3,7 +3,7 @@
 -export([nums/0, strings/0, even/0, combined/0, deep/0]).
 
 nums() ->
-    X = [1, 2, 3, 4, 5],
+    X = lists:seq(1, 20),
     print(X).
 
 strings() ->
