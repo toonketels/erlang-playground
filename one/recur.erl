@@ -1,6 +1,6 @@
 -module(recur).
 
--export([factorial/1,len/1,len_t/1,tail_len/1,tail_factorial/1,duplicate/2,reverse/1,sublist/2,zip/2,lenient_zip/2]).
+-export([factorial/1,len/1,len_t/1,tail_len/1,tail_factorial/1,duplicate/2,reverse/1,sublist/2,zip/2,lenient_zip/2,quicksort/1,qsort/1]).
 
 factorial(0) ->
     1;
@@ -90,3 +90,42 @@ lenient_zip(_,[],Zl) ->
     reverse(Zl);
 lenient_zip([H1|T1], [H2|T2], Zl) ->
     lenient_zip(T1, T2, [{H1,H2}|Zl]).
+
+% quicksort sorting algorithm.
+%
+% - Take an item (the pivot)
+% - Go over all other items and divide them into a
+%   smaller then pivot,larger then pivot group (partition).
+% - Sort the smaller and larger groups (by calling itself on each group)
+% - Once groups sorted, join in one lists
+quicksort([]) ->
+    [];
+quicksort([Pivot|Rest]) ->
+    {Smaller, Bigger} = partition(Pivot,Rest,[],[]),
+    quicksort(Smaller) ++ [Pivot] ++ quicksort(Bigger).
+partition(_,[],Smaller,Bigger) ->
+    {Smaller,Bigger};
+partition(Pivot,[H|T],Smaller,Bigger) ->
+    if H =< Pivot -> partition(Pivot,T,[H|Smaller],Bigger);
+       H > Pivot -> partition(Pivot,T,Smaller,[H|Bigger])
+    end.
+
+% A more optimized version:
+% - uses tailrecursion (lower memory footprint)
+% - equal to privots are not added to larger / smaller groups
+%
+% Even better: the pivot should be taken random
+% to minimize risk of taken the highest/lowest value.
+qsort(L) ->
+    qsort(L,[]).
+qsort([],Acc) ->
+    Acc;
+qsort([Pivot|Rest], Acc) ->
+    part(Pivot,Rest,{[],[Pivot],[]},Acc).
+part(_,[],{Smaller,Equal,Larger},Acc) ->
+    qsort(Smaller,Equal++qsort(Larger,Acc));
+part(Pivot,[H|T],{Smaller,Equal,Larger},Acc) ->
+    if H < Pivot -> part(Pivot,T,{[H|Smaller],Equal,Larger},Acc);
+       H > Pivot -> part(Pivot,T,{Smaller,Equal,[H|Larger]},Acc);
+       H == Pivot -> part(Pivot,T,{Smaller,[H|Equal],Larger},Acc)
+    end.
