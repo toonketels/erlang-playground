@@ -7,7 +7,9 @@ main() ->
     {ok, Binary} = file:read_file(File),
     Roads = parse_map(Binary),
     Grouped = tregroup(Roads),
-    getShortestPath(Grouped).
+    % getShortestPath(Grouped).
+    optimal_path(Grouped).
+
 
 parse_map(Binary) when is_binary(Binary) ->
     parse_map(binary_to_list(Binary));
@@ -64,6 +66,24 @@ isShortest({A,B,X}, {Length, Previous = [b|_]}) ->
     if  B < X + A -> {Length + B, [b|Previous]};
         true -> {Length + X + A, [a,x | Previous]}
     end.
+
+
+
+
+% Official implementation
+
+optimal_path(L) ->
+    {{DistA, PathA}, {DistB, PathB}} = lists:foldl(fun shortest_step/2, {{0, []}, {0, []}}, L),
+    {Dist, Path} = erlang:min({DistA, PathA}, {DistB, PathB}),
+    {Dist, lists:reverse(Path)}.
+
+
+shortest_step({A,B,X}, {{DistA, PathA}, {DistB, PathB}}) ->
+    OptA1 = {DistA + A, [{a,A}|PathA]},
+    OptA2 = {DistB + B + X, [{x,X},{b,B}|PathB]},
+    OptB1 = {DistB + B, [{b,B}|PathB]},
+    OptB2 = {DistA + A + X, [{x,X}, {a,A}|PathA]},
+    {erlang:min(OptA1, OptA2), erlang:min(OptB1, OptB2)}.
 
 
 
