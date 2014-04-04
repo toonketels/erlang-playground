@@ -31,44 +31,6 @@ tregroup([], Acc) -> lists:reverse(Acc);
 tregroup([A,B], Acc) -> tregroup([], [{A,B,0}|Acc]);
 tregroup([A,B,X | T], Acc) -> tregroup(T, [{A,B,X}|Acc]).
 
-% Data data structure we're after:
-%
-% {length, [A, A, X, B, A]}
-%
-% For each step calculate what is the shortest to go
-% to A or to B and we choose that route, and continue
-getShortestPath(Paths) ->
-    {Length, P} = lists:foldl(fun isShortest/2, {0, []}, Paths),
-    {Length, lists:reverse(P)}.
-
-isShortest({A,B,X}, {Length, []}) ->
-    A1 = A,
-    A2 = B + X,
-    B1 = B,
-    B2 = A + X,
-    if  A1 < A2 -> ShortestA = {A1, [a]};
-        true -> ShortestA = {A2, [b, x]}
-    end,
-    if  B1 < B2 -> ShortestB = {B1, [b]};
-        true -> ShortestB = {B2, [a, x]}
-    end,
-    if  ShortestA < ShortestB -> Path = ShortestA;
-        true -> Path = ShortestB
-    end,
-    {Path_length, Path_steps} = Path,
-    {Length + Path_length, Path_steps};
-% Now, we take the last selected into account
-isShortest({A,B,X}, {Length, Previous = [a|_]}) ->
-    if  A < X + B -> {Length + A, [a|Previous]};
-        true -> {Length + X + B, [b,x | Previous]}
-    end;
-isShortest({A,B,X}, {Length, Previous = [b|_]}) ->
-    if  B < X + A -> {Length + B, [b|Previous]};
-        true -> {Length + X + A, [a,x | Previous]}
-    end.
-
-
-
 
 % Official implementation
 
@@ -77,7 +39,16 @@ optimal_path(L) ->
     {Dist, Path} = erlang:min({DistA, PathA}, {DistB, PathB}),
     {Dist, lists:reverse(Path)}.
 
-
+% On a given point we can:
+%   - go ahead
+%   - go ahead and make a turn
+%
+% Since go ahead is always bigger, we take the next steps into account.
+%
+% Basically it goes like.
+%   - the shortest rout to two alternatives
+%   - the shortest route to next two alternatives from previous two alternatives
+%   - ...
 shortest_step({A,B,X}, {{DistA, PathA}, {DistB, PathB}}) ->
     OptA1 = {DistA + A, [{a,A}|PathA]},
     OptA2 = {DistB + B + X, [{x,X},{b,B}|PathB]},
@@ -96,3 +67,49 @@ shortest_step({A,B,X}, {{DistA, PathA}, {DistB, PathB}}) ->
 %     io:format("The file contents: ~p~n", [List2]),
 %     List3 = [list_to_integer(S) || S <- List2],
 %     io:format("The file contents: ~p~n", [List3]).
+
+% Flawed implementation below.
+%
+% Made the error in shortest path to thing
+% X represeted the X before.
+% Since this is no longer the case, our algo
+% now keeps selecting the same path after the
+% first decision.
+
+% All below is not usefull!!!
+
+% Data data structure we're after:
+%
+% {length, [A, A, X, B, A]}
+%
+% For each step calculate what is the shortest to go
+% to A or to B and we choose that route, and continue
+getShortestPath(Paths) ->
+    {Length, P, _} = lists:foldl(fun isShortest/2, {0, []}, Paths),
+    {Length, lists:reverse(P)}.
+
+isShortest({A,B,X}, {Length, []}) ->
+    A1 = A,
+    A2 = B + X,
+    B1 = B,
+    B2 = A + X,
+    if  A1 < A2 -> ShortestA = {A1, [{a,A}], a};
+        true -> ShortestA = {A2, [{x,X}, {b,B}], a}
+    end,
+    if  B1 < B2 -> ShortestB = {B1, [{b,B}], b};
+        true -> ShortestB = {B2, [{x,X}, {a,A}], b}
+    end,
+    if  ShortestA < ShortestB -> Path = ShortestA;
+        true -> Path = ShortestB
+    end,
+    {Path_length, Path_steps, End} = Path,
+    {Length + Path_length, Path_steps, End};
+% Now, we take the last selected into account
+isShortest({A,B,X}, {Length, Previous, a}) ->
+    if  A < X + A -> {Length + A, [{a,A}|Previous], a};
+        true -> {Length + X + A, [{x,X},{a,A} | Previous], b}
+    end;
+isShortest({A,B,X}, {Length, Previous, b}) ->
+    if  B < X + B -> {Length + B, [{b,B}|Previous],b};
+        true -> {Length + X + B, [{x,X},{b,B} | Previous], a}
+    end.
