@@ -1,14 +1,17 @@
+% Run program do:
+% erl -noshell -run road main road.txt
 -module(road).
 
--export([main/0, isShortest/2]).
+-export([main/1, isShortest/2]).
 
-main() ->
-    File = "road.txt",
-    {ok, Binary} = file:read_file(File),
+main([Filename]) ->
+    % File = "road.txt",
+    {ok, Binary} = file:read_file(Filename),
     Roads = parse_map(Binary),
     Grouped = tregroup(Roads),
     % getShortestPath(Grouped).
-    optimal_path(Grouped).
+    io:format("~p~n", [optimal_path(Grouped)]),
+    erlang:halt().
 
 
 parse_map(Binary) when is_binary(Binary) ->
@@ -36,8 +39,8 @@ tregroup([A,B,X | T], Acc) -> tregroup(T, [{A,B,X}|Acc]).
 
 optimal_path(L) ->
     {A, B} = lists:foldl(fun shortest_step/2, {{0, []}, {0, []}}, L),
-    io:format("A: ~p~n", [PathA]),
-    io:format("B: ~p~n", [PathB]),
+    io:format("A: ~p~n", [A]),
+    io:format("B: ~p~n", [B]),
     {Dist, Path} = if hd(element(2,A)) =/= {x,0} -> A;
                       hd(element(2,B)) =/= {x,0} -> B
                   end,
