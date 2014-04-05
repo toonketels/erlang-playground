@@ -35,8 +35,12 @@ tregroup([A,B,X | T], Acc) -> tregroup(T, [{A,B,X}|Acc]).
 % Official implementation
 
 optimal_path(L) ->
-    {{DistA, PathA}, {DistB, PathB}} = lists:foldl(fun shortest_step/2, {{0, []}, {0, []}}, L),
-    {Dist, Path} = erlang:min({DistA, PathA}, {DistB, PathB}),
+    {A, B} = lists:foldl(fun shortest_step/2, {{0, []}, {0, []}}, L),
+    io:format("A: ~p~n", [PathA]),
+    io:format("B: ~p~n", [PathB]),
+    {Dist, Path} = if hd(element(2,A)) =/= {x,0} -> A;
+                      hd(element(2,B)) =/= {x,0} -> B
+                  end,
     {Dist, lists:reverse(Path)}.
 
 % On a given point we can:
@@ -54,7 +58,11 @@ shortest_step({A,B,X}, {{DistA, PathA}, {DistB, PathB}}) ->
     OptA2 = {DistB + B + X, [{x,X},{b,B}|PathB]},
     OptB1 = {DistB + B, [{b,B}|PathB]},
     OptB2 = {DistA + A + X, [{x,X}, {a,A}|PathA]},
-    {erlang:min(OptA1, OptA2), erlang:min(OptB1, OptB2)}.
+    Z = {One,Two} = {erlang:min(OptA1, OptA2), erlang:min(OptB1, OptB2)},
+    io:format("Step: ~n", []),
+    io:format("A   : ~p~n", [One]),
+    io:format("B   : ~p~n", [Two]),
+    Z.
 
 
 
