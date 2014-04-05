@@ -2,41 +2,36 @@
 % erl -noshell -run road main road.txt
 -module(road).
 
--export([main/1, isShortest/2]).
+-export([main/1,main/0]).
 
+% Starts the app...
+%
+main() -> main(["road.txt"]).
 main([Filename]) ->
-    % File = "road.txt",
     {ok, Binary} = file:read_file(Filename),
-    Roads = parse_map(Binary),
-    Grouped = tregroup(Roads),
-    % getShortestPath(Grouped).
-    io:format("~p~n", [optimal_path(Grouped)]),
+    Map = parse_map(Binary),
+    io:format("~p~n", [optimal_path(Map)]),
     erlang:halt().
 
-
+% Parses the file content into our
+% desired data structure.
+%
 parse_map(Binary) when is_binary(Binary) ->
     parse_map(binary_to_list(Binary));
 parse_map(String) when is_list(String) ->
-    [list_to_integer(S) || S <- string:tokens(String, "\n")].
-
-% Recursive regrouping.
-%
-% Note: we also take into account we might have to add
-% the last 0 value.
-% regroup([]) -> [];
-% regroup([A, B]) -> [{A, B, 0}];
-% regroup([A,B,X|T]) -> [{A,B,X} | regroup(T)].
+    Road_list = [list_to_integer(S) || S <- string:tokens(String, "\n")],
+    regroup(Road_list).
 
 % Tail recursive regrouping.
 %
-tregroup(L) -> tregroup(L, []).
-tregroup([], Acc) -> lists:reverse(Acc);
-tregroup([A,B], Acc) -> tregroup([], [{A,B,0}|Acc]);
-tregroup([A,B,X | T], Acc) -> tregroup(T, [{A,B,X}|Acc]).
+regroup(L) -> regroup(L, []).
+regroup([], Acc) -> lists:reverse(Acc);
+regroup([A,B], Acc) -> regroup([], [{A,B,0}|Acc]);
+regroup([A,B,X | T], Acc) -> regroup(T, [{A,B,X}|Acc]).
 
 
-% Official implementation
-
+% Folds the data structure to find the shortest path.
+%
 optimal_path(L) ->
     {A, B} = lists:foldl(fun shortest_step/2, {{0, []}, {0, []}}, L),
     io:format("A: ~p~n", [A]),
@@ -66,61 +61,3 @@ shortest_step({A,B,X}, {{DistA, PathA}, {DistB, PathB}}) ->
     io:format("A   : ~p~n", [One]),
     io:format("B   : ~p~n", [Two]),
     Z.
-
-
-
-% getStreets() ->
-%     {ok, Binary} = file:read_file("./road.txt"),
-%     io:format("The file contents: ~p~n", [Binary]),
-%     List =  binary_to_list(Binary),
-%     io:format("The file contents: ~p~n", [List]),
-%     List2 = string:tokens(List, "\n"),
-%     io:format("The file contents: ~p~n", [List2]),
-%     List3 = [list_to_integer(S) || S <- List2],
-%     io:format("The file contents: ~p~n", [List3]).
-
-% Flawed implementation below.
-%
-% Made the error in shortest path to thing
-% X represeted the X before.
-% Since this is no longer the case, our algo
-% now keeps selecting the same path after the
-% first decision.
-
-% All below is not usefull!!!
-
-% Data data structure we're after:
-%
-% {length, [A, A, X, B, A]}
-%
-% For each step calculate what is the shortest to go
-% to A or to B and we choose that route, and continue
-getShortestPath(Paths) ->
-    {Length, P, _} = lists:foldl(fun isShortest/2, {0, []}, Paths),
-    {Length, lists:reverse(P)}.
-
-isShortest({A,B,X}, {Length, []}) ->
-    A1 = A,
-    A2 = B + X,
-    B1 = B,
-    B2 = A + X,
-    if  A1 < A2 -> ShortestA = {A1, [{a,A}], a};
-        true -> ShortestA = {A2, [{x,X}, {b,B}], a}
-    end,
-    if  B1 < B2 -> ShortestB = {B1, [{b,B}], b};
-        true -> ShortestB = {B2, [{x,X}, {a,A}], b}
-    end,
-    if  ShortestA < ShortestB -> Path = ShortestA;
-        true -> Path = ShortestB
-    end,
-    {Path_length, Path_steps, End} = Path,
-    {Length + Path_length, Path_steps, End};
-% Now, we take the last selected into account
-isShortest({A,B,X}, {Length, Previous, a}) ->
-    if  A < X + A -> {Length + A, [{a,A}|Previous], a};
-        true -> {Length + X + A, [{x,X},{a,A} | Previous], b}
-    end;
-isShortest({A,B,X}, {Length, Previous, b}) ->
-    if  B < X + B -> {Length + B, [{b,B}|Previous],b};
-        true -> {Length + X + B, [{x,X},{b,B} | Previous], a}
-    end.
