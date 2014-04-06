@@ -23,8 +23,17 @@ chain(N) ->
         _ -> ok
     end.
 
+listen() ->
+    receive
+        _ ->
+            io:format("Another message~n"),
+            listen()
+    end.
+
 % Same as above, except now we capture the exit signal so we can do stuff when a
-% linked process dies. We're still going to die too.
+% linked process dies and not die automatically.
+%
+% To force kill another process do exit(Pid, kill)
 chain_trapped(0) ->
     timer:sleep(5000),
     io:format("Last one about to die~n"),
@@ -36,5 +45,31 @@ chain_trapped(N)->
     link(Pid),
     receive
         Message ->
-            io:format("Received a msg: ~p~n",[Message])
+            io:format("Received a msg: ~p~n",[Message]),
+            exit(feel_like_it)
+            % listen()
     end.
+
+
+start_critic() -> spawn(?MODULE, critic, []).
+
+judge(Pid, Band, Album) ->
+    Pid ! {self(), {Band, Album}},
+    receive
+        {Pid, Criticism} -> Criticism
+    after 2000 ->
+        timeout
+    end.
+
+critic() ->
+    receive
+        {From, {"Rage against the Turing machine", "Unit Testify"}} ->
+            From ! {self(), "They are great"};
+        {From, {"System of a Downtime", "Memoize"}} ->
+            From ! {self(), "They're not Johnny Crash but they're good."};
+        {From, {"Johnny Crash", "The Token Ring of Fire"}} ->
+            From ! {self(), "Simply incredible."};
+        {From, {_Band, _Album}} ->
+            From ! {self(), "They are terrible!"}
+    end,
+    critic().
