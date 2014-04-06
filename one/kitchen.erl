@@ -9,10 +9,18 @@ start() -> start(dict:new()).
 start(Fridge_contents) -> spawn(?MODULE, refrigerator, [Fridge_contents]).
 
 store(Pid, Item) -> store(Pid, Item, 1).
-store(Pid, Item, Amount) -> Pid ! {self(), store, {Item, Amount}}.
+store(Pid, Item, Amount) ->
+    Pid ! {self(), {store, {Item, Amount}}},
+    receive
+        {Pid, Message} -> Message
+    end.
 
 take(Pid, Item) -> take(Pid, Item, 1).
-take(Pid, Item, Amount) -> Pid ! {self(), take, {Item, Amount}}.
+take(Pid, Item, Amount) ->
+    Pid ! {self(), {take, {Item, Amount}}},
+    receive
+        {Pid, Message} -> Message
+    end.
 
 %
 % Server implementation
@@ -20,25 +28,21 @@ take(Pid, Item, Amount) -> Pid ! {self(), take, {Item, Amount}}.
 
 refrigerator(State) ->
     receive
-        {Pid, store, {Item, Amount}} ->
+        {Pid, {store, {Item, Amount}}} ->
             State2 = dict:update(Item, fun (Old) -> Old + Amount end, Amount, State),
-            Pid ! {ok, "Stored it"},
+            Pid ! {self(), {ok, "Stored it"}},
             refrigerator(State2);
-        {Pid, store, Item} ->
-            State2 = dict:update(Item, fun (Old) -> Old + 1 end, 1, State),
-            Pid ! {ok, "Stored it"},
-            refrigerator(State2);
-        {Pid, take, {Item, Amount}} ->
+        {Pid, {take, {Item, Amount}}} ->
             case dict:find(Item, State) of
                 {ok, Value} when Value >= Amount ->
                     State2 = dict:update(Item, fun (Old) -> Old - Amount end, State),
-                    Pid ! {ok, "Took it"},
+                    Pid ! {self(), {ok, "Took it"}},
                     refrigerator(State2);
                 {ok, _} ->
-                    Pid ! {error, "Not enough in fridge"},
+                    Pid ! {self(), {error, "Not enough in fridge"}},
                     refrigerator(State);
                 error ->
-                    Pid ! {error, "Not in fridge"},
+                    Pid ! {self(), {error, "Not in fridge"}},
                     refrigerator(State)
             end
     end.
