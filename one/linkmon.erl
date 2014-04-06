@@ -52,9 +52,35 @@ chain_trapped(N)->
 
 
 start_critic() -> spawn(?MODULE, critic, []).
+start_critic2() -> spawn(?MODULE, restarter, []).
+
+restarter() ->
+    process_flag(trap_exit, true),
+    Pid = spawn_link(?MODULE, critic, []),
+    erlang:register(critic, Pid),
+    receive
+        {'EXIT', Pid, normal} ->
+            io:format("Supervisor notices the critic died normally~n"),
+            ok;
+        {'EXIT', Pid, shutdown} ->
+            io:format("Supervisor noticies the critic died because of shutdown~n"),
+            ok;
+        {'EXIT', Pid, _} ->
+            io:format("Supervisor noticies the critic died without any good reason, Restarting..."),
+            restarter()
+    end.
 
 judge(Pid, Band, Album) ->
     Pid ! {self(), {Band, Album}},
+    receive
+        {Pid, Criticism} -> Criticism
+    after 2000 ->
+        timeout
+    end.
+
+judge2(Band, Album) ->
+    critic ! {self(), {Band, Album}},
+    Pid = whereis(critic),
     receive
         {Pid, Criticism} -> Criticism
     after 2000 ->
