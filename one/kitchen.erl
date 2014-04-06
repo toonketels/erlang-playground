@@ -1,7 +1,22 @@
 -module(kitchen).
 -compile(export_all).
 
-start() -> refrigerator(dict:new()).
+%
+% Client api - startup and hides the protocol used (message format)
+%
+
+start() -> start(dict:new()).
+start(Fridge_contents) -> spawn(?MODULE, refrigerator, [Fridge_contents]).
+
+store(Pid, Item) -> store(Pid, Item, 1).
+store(Pid, Item, Amount) -> Pid ! {self(), store, {Item, Amount}}.
+
+take(Pid, Item) -> take(Pid, Item, 1).
+take(Pid, Item, Amount) -> Pid ! {self(), take, {Item, Amount}}.
+
+%
+% Server implementation
+%
 
 refrigerator(State) ->
     receive
