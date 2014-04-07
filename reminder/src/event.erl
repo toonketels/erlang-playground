@@ -1,12 +1,42 @@
 -module(event).
--export([loop/1]).
+-export([start/2, start_link/2, cancel/1, init/3]).
 
 -record(state, {server,
                  name="",
                  to_go=0}).
 
-loop(S = #state{to_go=Time}) when is_number(Time) ->
-    loop(S#state{to_go=normalize(Time)});
+%
+% Public api
+%
+
+start(EventName, Delay) ->
+    spawn(?MODULE, init, [self(), EventName, Delay]).
+
+start_link(EventName, Delay) ->
+    spawn_link(?MODULE, init, [self(), EventName, Delay]).
+
+cancel(Pid) ->
+    Ref = erlang:monitor(process, Pid),
+    Pid ! {self(), Ref, cancel},
+    receive
+        {Ref, ok} ->
+            erlang:demonitor(Ref, [flush]),
+            ok;
+        {'DOWN',Ref, process, Pid, _Reason} ->
+            ok
+    end.
+
+
+
+%
+% Inner workings...
+%
+
+init(Server, EventName, Delay) ->
+    loop(#state{server=Server,
+                name=EventName,
+                to_go=normalize(Delay)}).
+
 loop(S = #state{server=Server, to_go=[T|Next]}) ->
     receive
         {Server, Ref, cancel} -> Server ! {Ref, ok}
