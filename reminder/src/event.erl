@@ -9,11 +9,11 @@
 % Public api
 %
 
-start(EventName, Delay) ->
-    spawn(?MODULE, init, [self(), EventName, Delay]).
+start(EventName, Datetime) ->
+    spawn(?MODULE, init, [self(), EventName, Datetime]).
 
-start_link(EventName, Delay) ->
-    spawn_link(?MODULE, init, [self(), EventName, Delay]).
+start_link(EventName, Datetime) ->
+    spawn_link(?MODULE, init, [self(), EventName, Datetime]).
 
 cancel(Pid) ->
     Ref = erlang:monitor(process, Pid),
@@ -32,10 +32,10 @@ cancel(Pid) ->
 % Inner workings...
 %
 
-init(Server, EventName, Delay) ->
+init(Server, EventName, Datetime) ->
     loop(#state{server=Server,
                 name=EventName,
-                to_go=normalize(Delay)}).
+                to_go=time_to_go(Datetime)}).
 
 loop(S = #state{server=Server, to_go=[T|Next]}) ->
     receive
@@ -45,6 +45,15 @@ loop(S = #state{server=Server, to_go=[T|Next]}) ->
             Next =/= [] -> loop(S#state{to_go=Next})
         end
     end.
+
+time_to_go(Timeout = {{_,_,_}, {_,_,_}}) ->
+    Now = calendar:local_time(),
+    ToGo = calendar:datetime_to_gregorian_seconds(Timeout) -
+           calendar:datetime_to_gregorian_seconds(Now),
+    Secs = if ToGo >= 0 -> ToGo;
+              ToGo < 0 -> 0
+        end,
+    normalize(Secs).
 
 % Work around timer upperlimit...
 normalize(N) ->
