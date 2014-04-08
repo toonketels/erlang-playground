@@ -6,12 +6,12 @@
 -export([init/0]).
 
 -record(state, {events,
-                 clients}).
+                clients}).
 
 -record(event, {name="",
-                 description="",
-                 pid,
-                 timeout={{1970,1,1},{0,0,0}}}).
+                description="",
+                pid,
+                timeout={{1970,1,1},{0,0,0}}}).
 
 %
 %  Public api
@@ -63,7 +63,21 @@ loop(S = #state{}) ->
                     Pid ! {MsgRef, {error, bad_timeout}},
                     loop(S)
             end;
-        % {Pid, MsgRef, {cancel, Name}} -> todo;
+
+        % Client cancels an event...
+        {Pid, MsgRef, {cancel, Name}} ->
+            Events = case orddict:find(Name, S#state.events) of
+                    {ok, Event} ->
+                        event:cancel(Event#event.pid),
+                        orddict:erase(Name, S#state.events);
+                    error ->
+                            S#state.events
+                    end,
+            Pid ! {MsgRef,  ok},
+            loop(S#state{events=Events});
+
+
+
         % {done, Name} -> todo;
         % shutdown -> todo;
         % {'DOWN', Ref, process, _Pid, _Reason} -> todo;
