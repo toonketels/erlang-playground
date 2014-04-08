@@ -34,8 +34,35 @@ init() ->
 
 loop(S = #state{}) ->
     receive
-        % {Pid, MsgRef, {subscribe, Client}} -> todo;
-        % {Pid, MsgRef, {add, Name, Description, Timeout}} -> todo;
+
+        % Client wants to subscibe.
+        % We monitor to be notified when client disconnects (dies). When so
+        % we can remove the client record.
+        {Pid, MsgRef, {subscribe, Client}} ->
+            Ref = erlang:monitor(process, Client),
+            ClientsUpdated = orddict:store(Ref, Client, S#state.clients),
+            Pid ! {MsgRef, ok},
+            loop(S#state{clients=ClientsUpdated});
+
+        % Client creates notification.
+        % We store the events record and link with the newly spawned timer.
+        %
+        % Not sure, why we linked?
+        {Pid, MsgRef, {add, Name, Description, Timeout}} ->
+            case valid_datetime(Timeout) of
+                true ->
+                    EventPid = event:start_link(Name, Timeout),
+                    Event = #event{name=Name,
+                                   description=Description,
+                                   pid=EventPid,
+                                   timeout=Timeout},
+                    EventsUpdated = orddict:store(Name, Event, S#state.events),
+                    Pid ! {MsgRef, ok},
+                    loop(S#state{events=EventsUpdated});
+                false ->
+                    Pid ! {MsgRef, {error, bad_timeout}},
+                    loop(S)
+            end;
         % {Pid, MsgRef, {cancel, Name}} -> todo;
         % {done, Name} -> todo;
         % shutdown -> todo;
@@ -45,3 +72,21 @@ loop(S = #state{}) ->
             io:format("Unknown message: ~p~n", [Unknown]),
             loop(S)
     end.
+
+
+% Time validation...
+%
+valid_datetime({Date, Time}) ->
+    try
+        calendar:valid_date(Date) andalso valid_time(Time)
+    catch
+        error:function_clause ->
+            false
+    end;
+valid_datetime(_) -> false.
+
+valid_time({H,Min,S}) -> valid_time(H, Min, S).
+valid_time(H, M, S) when H >= 0, H < 24,
+                         M >= 0, M < 60,
+                         s >= 0, S < 60 -> true;
+valid_time(_,_,_) -> false.
