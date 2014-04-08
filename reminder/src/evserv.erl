@@ -76,6 +76,17 @@ loop(S = #state{}) ->
             Pid ! {MsgRef,  ok},
             loop(S#state{events=Events});
 
+        % Send by timer when it completes
+        {done, Name} ->
+            % notify subscribers, remove the
+            Events = case orddict:find(Name, S#state.events) of
+                        {ok, Event} ->
+                            notify_all_clients(S#state.clients, Event),
+                            orddict:erase(Name, S#state.events);
+                        error ->
+                            S#state.events
+                    end,
+            loop(S#state{events=Events});
 
 
         % {done, Name} -> todo;
@@ -86,6 +97,13 @@ loop(S = #state{}) ->
             io:format("Unknown message: ~p~n", [Unknown]),
             loop(S)
     end.
+
+
+notify_all_clients([], _) -> ok;
+notify_all_clients([ClientPid|T], Event) ->
+    ClientPid ! {done, Event#event.name, Event#event.description},
+    notify_all_clients(T, Event).
+
 
 
 % Time validation...
