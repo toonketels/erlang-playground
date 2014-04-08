@@ -88,6 +88,15 @@ loop(S = #state{}) ->
                     end,
             loop(S#state{events=Events});
 
+        shutdown -> exit(shutdown);
+
+        % We monitor the clients connecting to us so we get this
+        % message whenever such a  client dies...
+        {'DOWN', Ref, process, _Pid, _Reason} ->
+            loop(S#state{clients=orddict:erase(Ref, S#state.clients)});
+
+        % A new loop with absolute path to reload the code...
+        code_change -> ?MODULE:loop(S);
 
         % {done, Name} -> todo;
         % shutdown -> todo;
