@@ -26,7 +26,7 @@ start() ->
     Pid.
 
 start_link() ->
-    register(?MODULE, Pid=spawn_link(?MODULE, link, [])),
+    register(?MODULE, Pid=spawn_link(?MODULE, init, [])),
     Pid.
 
 terminate() ->
