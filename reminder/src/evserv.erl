@@ -3,7 +3,7 @@
 %%% It stores event information, spawns timers and notifies clients when timers
 %%% are done.
 -module(evserv).
--export([init/0]).
+-export([start/0, start_link/0, terminate/0, init/0, subscribe/1, add_event/3, cancel/1, listen/1]).
 
 -record(state, {events,
                 clients}).
@@ -14,11 +14,68 @@
                 timeout={{1970,1,1},{0,0,0}}}).
 
 %
-%  Public api
+%  Public api - interface function
 %
 
+% Since we only need one server, we use register to expose it under its
+% modue name.
+%
+% Calling start twice will throw exceptions..
+start() ->
+    register(?MODULE, Pid=spawn(?MODULE, init, [])),
+    Pid.
 
+start_link() ->
+    register(?MODULE, Pid=spawn_link(?MODULE, link, [])),
+    Pid.
 
+terminate() ->
+    ?MODULE ! shutdown.
+
+% Pass a pid to subscribe it. Often its just the same process
+% executing this code so we send our pid twice (first part message to respond
+% to, and as Client). Doing so we can use intermediaries to subscribe clients.
+subscribe(Pid) ->
+    % Client monitoring the server...
+    % We reuse the unique identifier to also identify the message instead of
+    % creating a new ref just for that.
+    Ref = erlang:monitor(process, whereis(?MODULE)),
+    ?MODULE ! {self(), Ref, {subscribe, Pid}},
+    receive
+        {Ref, ok} ->
+            {ok, Ref};
+        {'DOWN', Ref, process, _Pid, Reason} ->
+            {error, Reason}
+        after 2000 ->
+            {error, timeout}
+        end.
+
+% Adding a reminder, we dont care who adds it, all clients will be notified.
+add_event(Name, Description, Timeout) ->
+    Ref = make_ref(),
+    ?MODULE ! {self(), Ref, {add, Name, Description, Timeout}},
+    receive
+        {Ref, Msg} -> Msg
+    after 2000 ->
+        {error, timeout}
+    end.
+
+cancel(Name) ->
+    Ref = make_ref(),
+    ?MODULE ! {self(), Ref, {cancel, Name}},
+    receive
+        {Ref, ok} -> ok
+    after 2000 ->
+        {error, timeout}
+    end.
+
+listen(Delay) ->
+    receive
+        M = {done, _Name, _Description} ->
+            [M | listen(0)]
+    after Delay * 1000 ->
+        []
+    end.
 
 %
 % Internals
@@ -81,7 +138,7 @@ loop(S = #state{}) ->
             % notify subscribers, remove the
             Events = case orddict:find(Name, S#state.events) of
                         {ok, Event} ->
-                            notify_all_clients(S#state.clients, Event),
+                            send_to_clients({done, Event#event.name, Event#event.description}, S#state.clients),
                             orddict:erase(Name, S#state.events);
                         error ->
                             S#state.events
@@ -95,7 +152,7 @@ loop(S = #state{}) ->
         {'DOWN', Ref, process, _Pid, _Reason} ->
             loop(S#state{clients=orddict:erase(Ref, S#state.clients)});
 
-        % A new loop with absolute path to reload the code...
+        % A new loop with a fully qualified call to reload the code...
         code_change -> ?MODULE:loop(S);
 
         % {done, Name} -> todo;
@@ -108,11 +165,12 @@ loop(S = #state{}) ->
     end.
 
 
-notify_all_clients([], _) -> ok;
-notify_all_clients([ClientPid|T], Event) ->
-    ClientPid ! {done, Event#event.name, Event#event.description},
-    notify_all_clients(T, Event).
-
+% Used to be notify_all_clients but we cannot
+% just recur on an orddict, we need to use map.
+%
+send_to_clients(Message, Clients) ->
+    io:format("Notifying all clients~n", []),
+    orddict:map(fun(_Ref, Pid) -> Pid ! Message end, Clients).
 
 
 % Time validation...
