@@ -1,4 +1,6 @@
 % Do `erl -make` to build project
+% Start shell via `erl -pa ebin/`
+% and do `make:all([load]).` to recompile.
 {'src/*', [debug_info,
            {i, "include"},
            {i, "src"},
