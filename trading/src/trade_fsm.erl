@@ -12,21 +12,46 @@
 % Public API
 %
 
-start(_) -> todo.
+start(Name) ->
+    gen_fsm:start(?MODULE, [Name], []).
 
-start_link(_) -> todo.
+start_link(Name) ->
+    gen_fsm:start_link(?MODULE, [Name], []).
 
-trade(_,_) -> todo.
+% Initiate a trade sessions. Returns when the other accepts/refuses.
+%
+% OwnPid: us instruction our tade_fsm to initialize a trade with the other.
+%
+trade(OwnPid,OtherPid) ->
+    gen_fsm:sync_send_event(OwnPid, {negotiate, OtherPid},3000).
 
-accept_trade(_) -> todo.
+% Instruct our fsm to accept to trade
+%
+accept_trade(OwnPid) ->
+    gen_fsm:sync_send_event(OwnPid, accept_negotiate).
 
-make_offer(_,_) -> todo.
+% Instruct our fsm to send an offer
+%
+make_offer(OwnPid,Item) ->
+    gen_fsm:send_event(OwnPid, {make_offer, Item}).
 
-retract_offer(_,_) -> todo.
+% Instruct our fsm to cancel offer.
+%
+retract_offer(OwnPid,Item) ->
+    gen_fsm:send_event(OwnPid, {retract_offer, Item}).
 
-ready(_) -> todo.
+% Notify other we are ready for trading...
+% We will wait until other is ready too...
+%
+ready(OwnPid) ->
+    gen_fsm:sync_send_event(OwnPid, ready, infinity).
 
-cancel(_) -> todo.
+% Cancel transaction
+%
+% This is send as a global event (no mother what the fsm state is)
+% 
+cancel(OwnPid) ->
+    gen_fsm:sync_send_all_state_event(OwnPid, cancel).
 
 
 
