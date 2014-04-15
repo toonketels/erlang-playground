@@ -66,27 +66,43 @@ cancel(OwnPid) ->
 %
 
 
-ask_negotiate() -> todo.
+% fsm aks other fsm to start trading
+%
+ask_negotiate(OwnPid,OtherPid) ->
+    gen_fsm:send_event(OtherPid, {ask_negotiate, OwnPid}).
 
-accept_negotiate() -> todo.
+% fsn accepts trading session other fgen_fsm
+%
+accept_negotiate(OwnPid, OtherPid) ->
+    gen_fsm:send_event(OtherPid, {accept_negotiate, OwnPid}).
 
-do_offer() -> todo.
+do_offer(OtherPid, Item) ->
+    gen_fsm:send_event(OtherPid, {do_offer, Item}).
 
-undo_offer() -> todo.
+undo_offer(OtherPid, Item) ->
+    gen_fsm:send_event(OtherPid, {undo_offer, Item}).
 
-are_you_ready() -> todo.
+are_you_ready(OtherPid) ->
+    gen_fsm:send_event(OtherPid, are_you_ready).
 
-not_yet() -> todo.
+not_yet(OtherPid) ->
+    gen_fsm:send_event(OtherPid, not_yet).
 
-am_ready() -> todo.
 
-ack_trans() -> todo.
+am_ready(OtherPid) ->
+    gen_fsm:send_event(OtherPid, 'ready!').
 
-ask_commit() -> todo.
+ack_trans(OtherPid) ->
+    gen_fsm:send_event(OtherPid, ack).
 
-do_commit() -> todo.
+ask_commit(OtherPid) ->
+    gen_fsm:sync_send_event(OtherPid, ask_commit).
 
-notify_cancel() -> todo.
+do_commit(OtherPid) ->
+    gen_fsm:sync_send_event(OtherPid, do_commit).
+
+notify_cancel(OtherPid) ->
+    gen_fsm:send_all_state_event(OtherPid, cancel).
 
 
 
