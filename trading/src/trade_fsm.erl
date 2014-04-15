@@ -8,9 +8,13 @@
 % custom state names
 -export([idle/2,idle/3,idle_wait/2,idle_wait/3,negotiate/2,negotiate/3,wait/2,ready/2,ready/3]).
 
+
 %
 % Public API
 %
+% Me (a person) and my fsm
+%
+
 
 start(Name) ->
     gen_fsm:start(?MODULE, [Name], []).
@@ -49,9 +53,42 @@ ready(OwnPid) ->
 % Cancel transaction
 %
 % This is send as a global event (no mother what the fsm state is)
-% 
+%
 cancel(OwnPid) ->
     gen_fsm:sync_send_all_state_event(OwnPid, cancel).
+
+
+
+%
+% fsm-to-fsm communication
+%
+% Note: this is intra module so does not have to be exported
+%
+
+
+ask_negotiate() -> todo.
+
+accept_negotiate() -> todo.
+
+do_offer() -> todo.
+
+undo_offer() -> todo.
+
+are_you_ready() -> todo.
+
+not_yet() -> todo.
+
+am_ready() -> todo.
+
+ack_trans() -> todo.
+
+ask_commit() -> todo.
+
+do_commit() -> todo.
+
+notify_cancel() -> todo.
+
+
 
 
 
