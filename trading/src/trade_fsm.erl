@@ -1,6 +1,18 @@
 -module(trade_fsm).
 -behavior(gen_fsm).
 
+%
+% Do differentiate user-to-fsm and fsm-to-fsm communication
+%
+
+
+-record(state, {name="",
+                 other,
+                 ownitems=[],
+                 otheritems=[],
+                 monitor,
+                 from}).
+
 % Public API
 -export([start/1,start_link/1,trade/2,accept_trade/1,make_offer/2,retract_offer/2,ready/1,cancel/1]).
 % gen_fsm callbacks
@@ -66,7 +78,7 @@ cancel(OwnPid) ->
 %
 
 
-% fsm aks other fsm to start trading
+% fsm asks other fsm to start trading
 %
 ask_negotiate(OwnPid,OtherPid) ->
     gen_fsm:send_event(OtherPid, {ask_negotiate, OwnPid}).
@@ -107,36 +119,12 @@ notify_cancel(OtherPid) ->
 
 
 
-
-%
-% Custom state names
-%
-
-idle(_,_) -> todo.
-
-idle(_,_,_) -> todo.
-
-idle_wait(_,_) -> todo.
-
-idle_wait(_,_,_) -> todo.
-
-negotiate(_,_) -> todo.
-
-negotiate(_,_,_) -> todo.
-
-wait(_,_) -> todo.
-
-ready(_,_) -> todo.
-
-ready(_,_,_) -> todo.
-
-
-
 %
 % gen_fsm callbacks
 %
 
-init(_Args) -> todo.
+init(Name) ->
+    {ok, idle, #state{name=Name}}.
 
 terminate(_Reason, _StateName, _StateData) -> todo.
 
@@ -150,3 +138,135 @@ handle_event(_Event, _StateName, _StateData) -> todo.
 handle_sync_event(_Event, _From, _StateName, _StateData) -> todo.
 
 handle_info(_Info, _StateName, _StateData) -> todo.
+
+
+%
+% Custom state names
+%
+
+
+% Aync messages in idle state...
+% Its the other fsm as our user only communicates synchronously.
+%
+% @see: http://www.erlang.org/doc/man/gen_fsm.html#Module:StateName-2
+idle({ask_negotiate, OtherPid},S=#state{}) ->
+    Ref=monitor(process, OtherPid),
+    notice(S, "~p asked for a trade negotiation", [OtherPid]),
+    {next_state, idle_wait, S#state{other=OtherPid, monitor=Ref}};
+idle(Event, S) ->
+    unexpected(Event, S),
+    {next_state, idle, S}.
+
+% Our client asks his fsm to negotiate a trade...
+%
+% Note: each 'client' runs in its own process and their fsm's too,
+%       so From Pid is not the same as fsm self().
+idle({ask_negotiate, OtherPid},From,S=#state{}) ->
+    Ref=monitor(process, OtherPid),
+    ask_negotiate(From, self()),
+    notice(S, "asking user ~p for a trade", [OtherPid]),
+    {next_state, idle_wait, S#state{other=OtherPid, monitor=Ref, from=From}};
+idle(Event, From, S) ->
+    unexpected(Event, S),
+    {next_state, idle, S}.
+
+% We wait for other client to accept negotiating or asking to negotiate (race cond).
+%
+% Here we match the OtherPid from the state to ensure its the same client we asked
+% to start negotiating.
+idle_wait({ask_negotiate, OtherPid}, S=#state{other=OtherPid}) ->
+    % fsm replies to sync_send_event from its client
+    gen_fsm:reply(S#state.from, ok),
+    % we dont have to notify the other fsm we accept because its wired the same
+    % way our fsm works, it will also just move to negotiate state.
+    notice(S, "Starting negotiation", []),
+    {next_state, negotiate, S};
+% The other accepts...
+idle_wait({accept_negotiate, OtherPid}, S=#state{other=OtherPid}) ->
+    gen_fsm:reply(S#state.from, ok),
+    notice(S, "Starting negotiation", []),
+    {next_state, negotiate, S};
+idle_wait(Event, S) ->
+    unexpected(Event, idle_wait),
+    {next_state, idle_wait, S}.
+
+% Ouf fsm client is accepting the trade...
+%
+idle_wait(accept_negotiate, _From, S=#state{other=OtherPid}) ->
+    % Inform other fsm we want to trade.
+    accept_negotiate(S#state.other, self()),
+    notice(S, "accepting negotiation", []),
+    {next_state, negotiate, S};
+idle_wait(Event, _From, S) ->
+    unexpected(Event, S),
+    {next_state, idle_wait, S}.
+
+% We make and offer...
+negotiate({make_offer, Item},S=#state{ownitems=OwnItems}) ->
+    do_offer(S#state.other, Item),
+    notice(S, "offering ~p", [Item]),
+    {next_state, negotiate, S#state{ownitems=add(Item,OwnItems)}};
+% We retract our offer...
+negotiate({retract_offer, Item},S=#state{ownitems=OwnItems}) ->
+    undo_offer(S#state.other, Item),
+    notice(S, "retracting ~p", [Item]),
+    {next_state, negotiate, S#state{ownitems=remove(Item,OwnItems)}};
+% Other party makes an offer...
+negotiate({do_offer, Item},S=#state{otheritems=OtherItems}) ->
+    notice(S, "other player offered ~p", [Item]),
+    {next_state, negotiate, S#state{otheritems=add(Item,OtherItems)}};
+% Other party cancels his offer.
+negotiate({undo_offer, Item},S=#state{otheritems=OtherItems}) ->
+    notice(S, "other player retracted ~p", [Item]),
+    {next_state, negotiate, S#state{otheritems=remove(Item,OtherItems)}};
+% Other party asks if we're ready, since we're not in the ready state,
+% we reply no.
+negotiate(are_you_ready,S=#state{other=OtherPid}) ->
+    io:format("Other user ready to trade~n"),
+    notice(S, "Other user ready to transfer goods:~n"
+              "You get ~p. The other side gets ~p~n", [S#state.otheritems, S#state.ownitems]),
+    not_yet(OtherPid),
+    {next_state, negotiate, S};
+negotiate(Event,S) ->
+    unexpected(Event, S),
+    {next_state, negotiate, S}.
+
+% User informs his fsm he's ready to trade.
+negotiate(ready,From,S=#state{other=OtherPid}) ->
+    are_you_ready(OtherPid),
+    notice(S, "asking if ready, waiting", []),
+    {next_state, wait, S#state{from=From}};
+negotiate(Event,_From,S) ->
+    unexpected(Evet, S),
+    {next_state, negotiate, S}.
+
+wait(_,_) -> todo.
+
+ready(_,_) -> todo.
+
+ready(_,_,_) -> todo.
+
+
+
+
+%
+% Utility funcs.
+%
+
+% When the fsm wants to notify his user...
+%
+notice(#state{name=N}, Str, Args) ->
+    io:format("~s: "++Str++"~n", [N|Args]).
+
+% Log unexpected messages.
+%
+unexpected(Msg, State) ->
+    io:format("~p received unknown event ~p while in state ~p~n", [self(), Msg, State]).
+
+% We want to easily swap out the way we store items traded.
+%
+add(Item, Items) ->
+    [Item | Items].
+
+remove(Item, Items) ->
+    Items -- [Item].
