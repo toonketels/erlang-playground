@@ -166,7 +166,7 @@ idle({ask_negotiate, OtherPid},From,S=#state{}) ->
     ask_negotiate(From, self()),
     notice(S, "asking user ~p for a trade", [OtherPid]),
     {next_state, idle_wait, S#state{other=OtherPid, monitor=Ref, from=From}};
-idle(Event, From, S) ->
+idle(Event, _From, S) ->
     unexpected(Event, S),
     {next_state, idle, S}.
 
@@ -192,7 +192,7 @@ idle_wait(Event, S) ->
 
 % Ouf fsm client is accepting the trade...
 %
-idle_wait(accept_negotiate, _From, S=#state{other=OtherPid}) ->
+idle_wait(accept_negotiate, _From, S=#state{}) ->
     % Inform other fsm we want to trade.
     accept_negotiate(S#state.other, self()),
     notice(S, "accepting negotiation", []),
@@ -237,14 +237,83 @@ negotiate(ready,From,S=#state{other=OtherPid}) ->
     notice(S, "asking if ready, waiting", []),
     {next_state, wait, S#state{from=From}};
 negotiate(Event,_From,S) ->
-    unexpected(Evet, S),
+    unexpected(Event, S),
     {next_state, negotiate, S}.
 
-wait(_,_) -> todo.
+% We're waiting for the other party to confirm he's ready...
+%
+% Since our client sends us a synchronous message to set the fsm
+% in the wait state, we have to reply to our client now
+%
+wait({do_offer, Item}, S=#state{otheritems=OtherItems}) ->
+    gen_fsm:reply(S#state.from, offer_changed),
+    notice(S, "other side offering ~p", [Item]),
+    {next_state, negotiate, S#state{otheritems=add(Item,OtherItems)}};
+wait({undo_offer, Item}, S=#state{otheritems=OtherItems}) ->
+    gen_fsm:reply(S#state.from, offer_changed),
+    notice(S, "other side retracting ~p", [Item]),
+    {next_state, negotiate, S#state{otheritems=remove(Item,OtherItems)}};
+% Race condition again...
+%
+% We reply the other fsm
+wait(are_you_ready, S=#state{}) ->
+    am_ready(S#state.other),
+    notice(S, "asked if ready. I am, waiting for same reply", []),
+    {next_state, wait, S};
+wait(not_yet, S=#state{}) ->
+    notice(S, "other party is not yet ready, waiting", []),
+    {next_state, wait, S};
+wait('ready!', S=#state{}) ->
+    am_ready(S#state.other),
+    ack_trans(S#state.other),
+    gen_fsm:reply(S#state.from, ok),
+    notice(S, "other is ready, lets get ready", []),
+    {next_state, ready, S};
+wait(Event, S) ->
+    unexpected(Event, S),
+    {next_state, wait, S}.
 
-ready(_,_) -> todo.
 
-ready(_,_,_) -> todo.
+% Ready for 2 phase commit-ish
+%
+ready(ack, S=#state{}) ->
+    case priority(self(), S#state.other) of
+        true ->
+            % We initialize synchronous communication
+            try
+                notice(S, "asking for commit", []),
+                ready_commit = ask_commit(S#state.other),
+                notice(S, "ordering commit", []),
+                ok = do_commit(S#state.other),
+                notice(S, "commiting...", []),
+                commit(S),
+                {stop, normal, ok, S}
+            catch Class:reason ->
+                % Abort, ask_commit or do_commit failed
+                notice(S, "commit failed", []),
+                {stop, {Class, reason}, S}
+            end;
+        false ->
+            % We waith for synchronous message
+            {next_state, ready, S}
+        end;
+ready(Event, S) ->
+    unexpected(Event, S),
+    {next_state, ready, S}.
+
+% Actuall commit is synchronous
+%
+ready(ask_commit, _From, S) ->
+    notice(S, "being asked to commit", []),
+    % strange syntax...
+    {reply, ready_commit, ready, S};
+ready(do_commit, _From, S) ->
+    notice(S, "commiting...", []),
+    commit(S),
+    {stop, normal, ok, S};
+ready(Event, _From, S) ->
+    unexpected(Event, S),
+    {next_state, ready, S}.
 
 
 
@@ -270,3 +339,16 @@ add(Item, Items) ->
 
 remove(Item, Items) ->
     Items -- [Item].
+
+% To elect one or fhe fsm's to initiate synchronous calls (prevent deadlocking)
+%
+priority(OwnPid, OtherPid) when OwnPid > OtherPid -> true;
+priority(OwnPid, OtherPid) when OwnPid < OtherPid -> false.
+
+
+commit(S=#state{}) ->
+    io:format("Transaction completed for ~s."
+              "Items sent are:~n~p,~n received are:~n~p.~n"
+              "This operation should have some atomic save "
+              "in a database.~n",
+              [S#state.name, S#state.ownitems, S#state.otheritems]).
