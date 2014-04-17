@@ -126,18 +126,51 @@ notify_cancel(OtherPid) ->
 init(Name) ->
     {ok, idle, #state{name=Name}}.
 
-terminate(_Reason, _StateName, _StateData) -> todo.
+terminate(normal, ready, State) ->
+    notice(State, "terminating", []);
+terminate(_Reason, _StateName, _State) ->
+    ok.
 
-code_change(_OldVsn, _StateName, _StateData, _Extra) -> todo.
-    %  {ok, NextStateName, NewStateData}
+% We're not updating the code for the moment...
+%
+code_change(_OldVsn, StateName, StateData, _Extra) ->
+     {ok, StateName, StateData}.
+
 
 % To handle global events, those send via gen_fsm:send_all_state_event/2
 %
-handle_event(_Event, _StateName, _StateData) -> todo.
 
-handle_sync_event(_Event, _From, _StateName, _StateData) -> todo.
+% Whenever the other player wants to cancel...
+% We just stop (exit the fsm)
+%
+handle_event(cancel, _StateName, State) ->
+    notice(State, "other player wants to cancel", []),
+    {stop, other_cancelled, State};
+handle_event(Event, StateName, State) ->
+    unexpected(Event, State),
+    {next_state, StateName, State}.
 
-handle_info(_Info, _StateName, _StateData) -> todo.
+% We want to cancel...
+%
+handle_sync_event(cancel, _From, _StateName, State) ->
+    notify_cancel(State#state.other),
+    notice(State, "cancelling trade, sending cancel event", []),
+    {stop, cancelled, ok, State};
+% We let the caller crash by not replying...
+handle_sync_event(Event, _From, StateName, State) ->
+    unexpected(Event, State),
+    {next_state, StateName, State}.
+
+
+% When the other process goes down...
+%
+handle_info({'DOWN', Ref, process, Pid, Reason}, _StateName, State=#state{other=Pid, monitor=Ref}) ->
+    notice(State, "other side dead", []),
+    {stop, {other_down, Reason}, State};
+handle_info(Event, StateName, State) ->
+    unexpected(Event, StateName),
+    {next_state, StateName, State}.
+
 
 
 %
@@ -314,7 +347,6 @@ ready(do_commit, _From, S) ->
 ready(Event, _From, S) ->
     unexpected(Event, S),
     {next_state, ready, S}.
-
 
 
 
