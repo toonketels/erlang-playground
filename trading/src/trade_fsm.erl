@@ -229,7 +229,7 @@ idle_wait(accept_negotiate, _From, S=#state{}) ->
     % Inform other fsm we want to trade.
     accept_negotiate(S#state.other, self()),
     notice(S, "accepting negotiation", []),
-    {next_state, negotiate, S};
+    {reply, ok, negotiate, S};
 idle_wait(Event, _From, S) ->
     unexpected(Event, idle_wait),
     {next_state, idle_wait, S}.
@@ -320,7 +320,7 @@ ready(ack, S=#state{}) ->
                 ok = do_commit(S#state.other),
                 notice(S, "commiting...", []),
                 commit(S),
-                {stop, normal, ok, S}
+                {stop, normal, S}
             catch Class:reason ->
                 % Abort, ask_commit or do_commit failed
                 notice(S, "commit failed", []),
