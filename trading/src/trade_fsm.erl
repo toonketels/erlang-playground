@@ -7,11 +7,11 @@
 
 
 -record(state, {name="",
-                 other,
-                 ownitems=[],
-                 otheritems=[],
-                 monitor,
-                 from}).
+                other,
+                ownitems=[],
+                otheritems=[],
+                monitor,
+                from}).
 
 % Public API
 -export([start/1,start_link/1,trade/2,accept_trade/1,make_offer/2,retract_offer/2,ready/1,cancel/1]).
@@ -80,12 +80,12 @@ cancel(OwnPid) ->
 
 % fsm asks other fsm to start trading
 %
-ask_negotiate(OwnPid,OtherPid) ->
+ask_negotiate(OtherPid, OwnPid) ->
     gen_fsm:send_event(OtherPid, {ask_negotiate, OwnPid}).
 
 % fsn accepts trading session other fgen_fsm
 %
-accept_negotiate(OwnPid, OtherPid) ->
+accept_negotiate(OtherPid, OwnPid) ->
     gen_fsm:send_event(OtherPid, {accept_negotiate, OwnPid}).
 
 do_offer(OtherPid, Item) ->
@@ -147,7 +147,7 @@ handle_event(cancel, _StateName, State) ->
     notice(State, "other player wants to cancel", []),
     {stop, other_cancelled, State};
 handle_event(Event, StateName, State) ->
-    unexpected(Event, State),
+    unexpected(Event, StateName),
     {next_state, StateName, State}.
 
 % We want to cancel...
@@ -158,7 +158,7 @@ handle_sync_event(cancel, _From, _StateName, State) ->
     {stop, cancelled, ok, State};
 % We let the caller crash by not replying...
 handle_sync_event(Event, _From, StateName, State) ->
-    unexpected(Event, State),
+    unexpected(Event, StateName),
     {next_state, StateName, State}.
 
 
@@ -187,20 +187,20 @@ idle({ask_negotiate, OtherPid},S=#state{}) ->
     notice(S, "~p asked for a trade negotiation", [OtherPid]),
     {next_state, idle_wait, S#state{other=OtherPid, monitor=Ref}};
 idle(Event, S) ->
-    unexpected(Event, S),
+    unexpected(Event, idle),
     {next_state, idle, S}.
 
 % Our client asks his fsm to negotiate a trade...
 %
 % Note: each 'client' runs in its own process and their fsm's too,
 %       so From Pid is not the same as fsm self().
-idle({ask_negotiate, OtherPid},From,S=#state{}) ->
+idle({negotiate, OtherPid},From,S=#state{}) ->
     Ref=monitor(process, OtherPid),
-    ask_negotiate(From, self()),
+    ask_negotiate(OtherPid, self()),
     notice(S, "asking user ~p for a trade", [OtherPid]),
     {next_state, idle_wait, S#state{other=OtherPid, monitor=Ref, from=From}};
 idle(Event, _From, S) ->
-    unexpected(Event, S),
+    unexpected(Event, idle),
     {next_state, idle, S}.
 
 % We wait for other client to accept negotiating or asking to negotiate (race cond).
@@ -231,7 +231,7 @@ idle_wait(accept_negotiate, _From, S=#state{}) ->
     notice(S, "accepting negotiation", []),
     {next_state, negotiate, S};
 idle_wait(Event, _From, S) ->
-    unexpected(Event, S),
+    unexpected(Event, idle_wait),
     {next_state, idle_wait, S}.
 
 % We make and offer...
@@ -261,7 +261,7 @@ negotiate(are_you_ready,S=#state{other=OtherPid}) ->
     not_yet(OtherPid),
     {next_state, negotiate, S};
 negotiate(Event,S) ->
-    unexpected(Event, S),
+    unexpected(Event, negotiate),
     {next_state, negotiate, S}.
 
 % User informs his fsm he's ready to trade.
@@ -270,7 +270,7 @@ negotiate(ready,From,S=#state{other=OtherPid}) ->
     notice(S, "asking if ready, waiting", []),
     {next_state, wait, S#state{from=From}};
 negotiate(Event,_From,S) ->
-    unexpected(Event, S),
+    unexpected(Event, negotiate),
     {next_state, negotiate, S}.
 
 % We're waiting for the other party to confirm he's ready...
@@ -303,7 +303,7 @@ wait('ready!', S=#state{}) ->
     notice(S, "other is ready, lets get ready", []),
     {next_state, ready, S};
 wait(Event, S) ->
-    unexpected(Event, S),
+    unexpected(Event, wait),
     {next_state, wait, S}.
 
 
@@ -331,7 +331,7 @@ ready(ack, S=#state{}) ->
             {next_state, ready, S}
         end;
 ready(Event, S) ->
-    unexpected(Event, S),
+    unexpected(Event, ready),
     {next_state, ready, S}.
 
 % Actuall commit is synchronous
@@ -345,7 +345,7 @@ ready(do_commit, _From, S) ->
     commit(S),
     {stop, normal, ok, S};
 ready(Event, _From, S) ->
-    unexpected(Event, S),
+    unexpected(Event, ready),
     {next_state, ready, S}.
 
 
