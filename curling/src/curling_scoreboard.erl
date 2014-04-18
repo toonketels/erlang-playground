@@ -1,8 +1,5 @@
 -module(curling_scoreboard).
 -behaviour(gen_event).
-
-% -import(curling_scoreboard_hw).
-
 -export([code_change/3,handle_call/2,handle_event/2,handle_info/2,init/1,terminate/2]).
 
 
