@@ -44,7 +44,7 @@ handle_cast(_Message, S) ->
 %
 handle_info(timeout, S=#state{name=N, skill=good}) ->
     io:format("~p produced sound~n", [N]),
-    {no_replay, S, ?DELAY};
+    {noreply, S, ?DELAY};
 handle_info(timeout, S=#state{name=N, skill=bad}) ->
     case random:uniform(5) of
         1 ->
@@ -67,8 +67,8 @@ terminate(bad_note, S) ->
 terminate(shutdown, S) ->
     io:format("Manager fires the whole band, ~s goes back to play in the subway~n", [S#state.name]);
 % All other reasons...
-terminate(_Reason, S) ->
-    io:format("~s has been kicked out (~s)~n", [S#state.name, S#state.role]).
+terminate(Reason, S) ->
+    io:format("~s has been kicked out (~s) for reason ~p~n", [S#state.name, S#state.role, Reason]).
 
 pick_name() ->
     lists:nth(random:uniform(10), firstnames()),

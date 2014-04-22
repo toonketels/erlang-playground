@@ -9,21 +9,21 @@ start_link(Type) ->
 
 init(lenient) ->
     init({one_for_one, 3, 60});
-init(angy) ->
+init(angry) ->
     init({rest_for_one, 2, 60});
 init(jerk) ->
     init({one_for_all, 1, 60});
-init({RestartStrategy, MaxRestorts, MaxTime}) ->
-    {ok, {RestartStrategy, MaxRestorts, MaxTime},
+init({RestartStrategy, MaxRestarts, MaxTime}) ->
+    {ok, {{RestartStrategy, MaxRestarts, MaxTime},
         [{singer,
             {musicians, start_link, [singer, good]},
-             permantent, 1000, worker, [musicians]},
+             permanent, 1000, worker, [musicians]},
          {bass,
              {musicians, start_link, [bass, good]},
-              termporary, 1000, worker, [musicians]},
+              temporary, 1000, worker, [musicians]},
          {drum,
              {musicians, start_link, [drum, bad]},
               transient, 1000, worker, [musicians]},
          {keytar,
              {musicians, start_link, [keytar, good]},
-              transient, 1000, worker, [musicians]}]}.
+              transient, 1000, worker, [musicians]}]}}.
