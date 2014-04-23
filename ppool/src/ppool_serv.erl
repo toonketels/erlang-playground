@@ -80,16 +80,40 @@ init({Limit, MFA, Sup}) ->
 
 code_change(_,_,_) -> todo.
 
-% Handle the run message...
-% 
+% Handle the messages...
+%
 handle_call({run, Args}, _From, S=#state{limit=N, sup=Sup, refs=R}) when N > 0 ->
     {ok, Pid} = supervisor:start_child(Sup, Args),
     Ref = erlang:monitor(process, Pid),
     {reply, {ok, Pid}, S#state{limit=N-1, refs=gb_sets:add(Ref, R)}};
 handle_call({run, _Args}, _From, S=#state{limit=N}) when N =< 0 ->
-    {reply, noalloc, S}.
+    {reply, noalloc, S};
 
-handle_cast(_,_) -> todo.
+handle_call({sync, Args}, _From, S=#state{limit=N, sup=Sup, refs=R}) when N > 0 ->
+    {ok, Pid} = supervisor:start_child(Sup, Args),
+    Ref = erlang:monitor(process, Pid),
+    {reply, {ok, Pid}, S#state{limit=N-1, refs=gb_sets:add(Ref, R)}};
+handle_call({sync, Args}, From, S=#state{limit=N, queue=Q}) when N =< 0 ->
+    {noreply,S#state{queue=queue:in({From, Args},Q)}};
+
+handle_call(stop, _From, State) ->
+    {stop, normal, ok, State};
+
+handle_call(_Msg, _From, State) ->
+    {noreply, State}.
+
+% Async messages...
+%
+handle_cast({async, Args}, S=#state{limit=N, sup=Sup, refs=R}) when N > 0 ->
+    {ok, Pid} = supervisor:start_child(Sup, Args),
+    Ref = erlang:monitor(process, Pid),
+    {noreply, S#state{limit=N-1, refs=gb_sets:add(Ref, R)}};
+
+handle_cast({async, Args}, S=#state{limit=N, queue=Q}) when N =< 0 ->
+    {noreply,S#state{queue=queue:in(Args, Q)}};
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
 
 % We handle the message we send to ourself to create the supervisor.
 %
