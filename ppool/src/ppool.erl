@@ -14,7 +14,8 @@ stop() ->
     ppool_supersup:stop().
 
 % Starts a new pool.
-% The MFA specifies how the workers should be supervised in the pool.
+% The MFA specifies how the workers should be supervised in the pool aka how
+% to start a worker (and so,what worker to use for that pool).
 %
 start_pool(Name, Limit, {M,F,A}) ->
     ppool_supersup:start_pool(Name, Limit, {M,F,A}).
@@ -24,6 +25,8 @@ start_pool(Name, Limit, {M,F,A}) ->
 stop_pool(Name) ->
     ppool_supersup:stop_pool(Name).
 
+% Args specify the values to pass for that worker process.
+% 
 run(Name, Args) ->
     ppool_serv:run(Name, Args).
 

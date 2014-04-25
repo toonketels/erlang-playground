@@ -34,4 +34,4 @@ stop_pool(Name) ->
 init([]) ->
     MaxRestarts = 6,
     MaxTime = 3600,
-    {ok, {{ok, one_for_one, MaxRestarts, MaxTime}, []}}.
+    {ok, {{one_for_one, MaxRestarts, MaxTime}, []}}.
