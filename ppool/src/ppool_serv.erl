@@ -78,7 +78,9 @@ init({Limit, MFA, Sup}) ->
     self() ! {start_worker_supervisor, Sup, MFA},
     {ok, #state{limit=Limit, refs=gb_sets:empty()}}.
 
-code_change(_,_,_) -> todo.
+% Not really upgrading...
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
 
 % Handle the messages...
 %
@@ -137,7 +139,8 @@ handle_info(Message, S) ->
     io:format("Unknown message: ~p~n", [Message]),
     {noreply, S}.
 
-terminate(_,_) -> todo.
+terminate(_Reason, _State) ->
+    ok.
 
 
 % Whenever a worker goes down, we try to get a new one out of the queue.
