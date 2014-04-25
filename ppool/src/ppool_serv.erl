@@ -120,8 +120,48 @@ handle_cast(_Msg, State) ->
 handle_info({start_worker_supervisor, Sup, MFA}, S=#state{}) ->
     {ok, Pid} = supervisor:start_child(Sup, ?SPEC(MFA)),
     {noreply, S#state{sup=Pid}};
+
+% Whenever a worker goes down, notify and dequeue...
+%
+handle_info({'DOWN', Ref, process, _Pid, _}, S=#state{refs=Refs}) ->
+    io:format("Recieved down msg~n"),
+    case gb_sets:is_element(Ref, Refs) of
+        true ->
+            handle_down_worker(Ref, S);
+        false ->
+            % We only care about our workers...
+            {noreply, S}
+    end;
+
 handle_info(Message, S) ->
     io:format("Unknown message: ~p~n", [Message]),
     {noreply, S}.
 
 terminate(_,_) -> todo.
+
+
+% Whenever a worker goes down, we try to get a new one out of the queue.
+% Depending on the kind (async, sync) we act differently.
+%
+% We pattern match on {{value ...}} so our code is only executed when the queue
+% is not empty.
+%
+handle_down_worker(Ref, S=#state{limit=L, sup=Sup, refs=Refs}) ->
+    case queue:out(S#state.queue) of
+        % sync, we need to reply...
+        {{value, {From, Args}}, Q} ->
+            {ok, Pid} = supervisor:start_child(Sup, Args),
+            NewRef = erlang:monitor(process, Pid),
+            NewRefs = gb_sets:insert(NewRef, gb_sets:delete(Ref, Refs)),
+            gen_server:reply(From, {ok, Pid}),
+            {noreply, S#state{refs=NewRefs, queue=Q}};
+        % async, we dont need to reply
+        {{value, Args}, Q} ->
+            {ok, Pid} = supervisor:start_child(Sup, Args),
+            NewRef = erlang:monitor(process, Pid),
+            NewRefs = gb_sets:insert(NewRef, gb_sets:delete(Ref, Refs)),
+            {noreply, S#state{refs=NewRefs, queue=Q}};
+        % queue is empty...
+        {empty, _} ->
+            {noreply, S#state{limit=L+1, refs=gb_sets:delete(Ref, Refs)}}
+    end.
