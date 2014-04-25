@@ -2,6 +2,8 @@
 % Start shell via `erl -pa ebin/`
 % and do `make:all([load]).` to recompile.
 {'src/*', [debug_info,
-           {i, "include"},
-           {i, "src"},
+           {i, "include/"},
+           {outdir, "ebin"}]}.
+{'test/*', [debug_info,
+           {i, "include/"},
            {outdir, "ebin"}]}.
