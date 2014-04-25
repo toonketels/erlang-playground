@@ -2,22 +2,15 @@
 %
 % Starts and stops pools by controlling the pool specific supervisor.
 %
+% Stopping the process is done by the OTP application.
+%
 -module(ppool_supersup).
 -behaviour(supervisor).
--export([start_link/0,stop/0,start_pool/3,stop_pool/1]).
+-export([start_link/0,start_pool/3,stop_pool/1]).
 -export([init/1]).
 
 start_link() ->
     supervisor:start_link({local, ppool}, ?MODULE, []).
-
-% killing supervisors is not easy, so we're brutal about it.
-%
-stop() ->
-    case whereis(ppool) of
-        P when is_pid(P) ->
-            exit(P, kill);
-        _ -> ok
-    end.
 
 start_pool(Name,Limit,MFA) ->
     ChildSpec = {Name,
