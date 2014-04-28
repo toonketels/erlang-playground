@@ -1,3 +1,7 @@
+% Main application.
+%
+% Starts the application supervisor.
+
 -module(erlcount).
 -behavior(application).
 -export([start/2,stop/1]).
