@@ -2,7 +2,7 @@
 % about when to use what func.
 
 -module(erlcount_lib).
--export([find_erl/1]).
+-export([find_erl/1,regex_count/2]).
 
 % We include a header file which contains the record #file_info{} so we can access
 % stats about a read file.
@@ -42,7 +42,7 @@ handle_directory(DirName, Queue) ->
 % We return the name to the caller, and a function which it can call to continue
 % searching for files (CFS, Continuation Passing Style - but not like the callbacks
 % in node).
-% 
+%
 handle_regular_file(FileName, Queue) ->
     case filename:extension(FileName) of
         '.erl' ->
@@ -68,3 +68,11 @@ enqueue_many(DirName, Files, Queue) ->
 
 find_erl(DirName) ->
     find_erl(DirName, queue:new()).
+
+% Counts occurences of regex matches.
+%
+regex_count(Re, Str) ->
+    case re:run(Str, Re, [global]) of
+        nomatch -> 0;
+        {match, List} -> length(List)
+    end.
