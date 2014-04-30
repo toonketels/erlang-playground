@@ -25,7 +25,7 @@ start_link() ->
 
 % Whenever a worker indicates is done
 complete(Pid,Regex,Ref,Count) ->
-    gsm_fsm:send_all_state_event(Pid, Regex, Ref, Count).
+    gen_fsm:send_all_state_event(Pid, {complete, Regex, Ref, Count}).
 
 
 %
@@ -58,7 +58,7 @@ terminate(_Reason,_State,_Data) ->
 %
 handle_event({complete, Regex, Ref, Count}, State, Data=#data{regex=Re, refs=Refs}) ->
     {Regex, OldCount} = lists:keyfind(Regex, 1, Re),
-    NewRe = list:keyreplace(Regex, 1, Re, {Regex, OldCount + Count}),
+    NewRe = lists:keyreplace(Regex, 1, Re, {Regex, OldCount + Count}),
     NewData = Data#data{regex=NewRe, refs=Refs--[Ref]},
     case State of
         dispatching ->

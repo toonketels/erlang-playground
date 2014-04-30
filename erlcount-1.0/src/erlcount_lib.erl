@@ -16,7 +16,7 @@
 % will just make the next item from the queue to be worked upon.
 
 find_erl(FileName, Queue) ->
-    {ok, F=#file_info{}} = file:read_file(FileName),
+    {ok, F=#file_info{}} = file:read_file_info(FileName),
     case F#file_info.type of
         directory -> handle_directory(FileName, Queue);
         regular -> handle_regular_file(FileName, Queue);
@@ -45,7 +45,7 @@ handle_directory(DirName, Queue) ->
 %
 handle_regular_file(FileName, Queue) ->
     case filename:extension(FileName) of
-        '.erl' ->
+        ".erl" ->
             {continue, FileName, fun() -> dequeue_and_run(Queue) end};
         _NonElr ->
             dequeue_and_run(Queue)
