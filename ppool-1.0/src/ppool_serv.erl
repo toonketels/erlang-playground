@@ -126,7 +126,6 @@ handle_info({start_worker_supervisor, Sup, MFA}, S=#state{}) ->
 % Whenever a worker goes down, notify and dequeue...
 %
 handle_info({'DOWN', Ref, process, _Pid, _}, S=#state{refs=Refs}) ->
-    io:format("Recieved down msg~n"),
     case gb_sets:is_element(Ref, Refs) of
         true ->
             handle_down_worker(Ref, S);
