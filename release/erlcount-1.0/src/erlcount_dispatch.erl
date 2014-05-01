@@ -48,7 +48,8 @@ init([]) ->
     end.
 
 terminate(_Reason,_State,_Data) ->
-    ok.
+    % Terminate the app and vm when we're done
+    init:stop().
 
 
 % Global events...
