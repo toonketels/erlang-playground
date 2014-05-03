@@ -1,6 +1,8 @@
 -module(regis_server_tests).
 -include_lib("eunit/include/eunit.hrl").
 
+% Macro auto generate the setup/teardown fictures before the test.
+% F is the test function.
 -define(setup(F), {setup, fun start/0, fun stop/1, F}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -22,7 +24,7 @@ register_test_() ->
       ?setup(fun two_names_one_pid/1)},
      {"Two processes cannot share the same name",
       ?setup(fun two_pids_one_name/1)}].
-      
+
 unregister_test_() ->
     [{"A process that was registered can be registered again iff it was "
       "unregistered between both calls",
@@ -74,7 +76,7 @@ two_names_one_pid(_) ->
 two_pids_one_name(_) ->
     Pid = proc_lib:spawn(fun() -> callback(myname) end),
     timer:sleep(15),
-    Res = regis_server:register(myname, self()),    
+    Res = regis_server:register(myname, self()),
     exit(Pid, kill),
     [?_assertEqual({error, name_taken}, Res)].
 
