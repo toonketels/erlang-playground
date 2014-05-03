@@ -43,12 +43,26 @@ handle_call(_E, _From, State) ->
     {noreply, State}.
 
 %% Accepting a connection
+%
+% Our accept message we send ourself to prevent blocking the init call.
 handle_cast(accept, S = #state{socket=ListenSocket}) ->
+
     %% this is the socket acceptance mentioned earlier
+
+    % We're waiting here (blocked) until some client tries to connect.
+    % As soon as a client connects, {ok, AcceptSocket}is returned.
+    %
+    % Our process is now handling this socket connection (stateful tcp session).
     {ok, AcceptSocket} = gen_tcp:accept(ListenSocket),
+
     %% Remember that thou art dust, and to dust thou shalt return.
     %% We want to always keep a given number of children in this app.
+
+    % We accepted the connection which means our process is busy, spin up another
+    % one waiting for a connection to be accepted
     sockserv_sup:start_socket(), % a new acceptor is born, praise the lord
+
+    % We talk to the connecting client...
     send(AcceptSocket, "What's your character's name?", []),
     {noreply, S#state{socket=AcceptSocket, next=name}};
 %% The player has given us his name (in handle_info)
@@ -84,12 +98,19 @@ handle_cast(Event, S = #state{name=N, socket=Sock}) when element(1, Event) =:= N
     {noreply, S}.
 
 %% The TCP client sends the string "quit". We close the connection.
+%
+% TCP client responses our casted to regular erlang messages.
+% These messages are like `{tcp, _Port, Msg}`. We use SOCK macro
+% to get the relevant part easily.
 handle_info(?SOCK("quit"++_), S) ->
     processquest:stop_player(S#state.name),
     gen_tcp:close(S#state.socket),
     {stop, normal, S};
 %% We receive a string while looking for a name -- we assume that hte
 %% string is the name.
+%
+% Here we pattern match the messages from the client by matching the state we've
+% put ourself into while sending our message to the client.
 handle_info(?SOCK(Str), S = #state{next=name}) ->
     Name = line(Str),
     gen_server:cast(self(), roll_stats),

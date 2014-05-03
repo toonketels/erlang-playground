@@ -15,5 +15,8 @@ initial_roll() ->
 roll() -> roll(1).
 
 %% Rolls Num 6-faced dice
+% 
+% Random is seeded in process handling the tcp connection. Since the seeding
+% is done once per process (global per process).
 roll(Num) ->
     lists:sum([random:uniform(6) || _ <- lists:seq(1,Num)]).
