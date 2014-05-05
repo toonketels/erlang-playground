@@ -9,4 +9,4 @@
         {answers, {<<"Yes">>,
                    <<"No">>,
                    <<"Maybe">>,
-                   <<"Could be">>}}]}]}
+                   <<"Could be">>}}]}]}.

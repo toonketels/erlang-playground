@@ -30,7 +30,7 @@ ask(_Question) ->
 % Initialize our random function. We could store the answers in the state but
 % we keep them in the config file instead.
 init([]) ->
-    <<A:32, B:32, C:32>> = crypto:random_bytes(12),
+    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
     random:seed(A,B,C),
     {ok, []}.
 
@@ -48,7 +48,7 @@ handle_call(stop, _From, State) ->
 % used. Its more efficient to only read on init.
 handle_call(question, _From, State) ->
     {ok, Answers} = application:get_env(m8ball, answers),
-    Answer = element(random:uniform(tuple:size(Answers)), Answers),
+    Answer = element(random:uniform(tuple_size(Answers)), Answers),
     {reply, Answer, State};
 
 handle_call(_Msg, _From, State) ->
