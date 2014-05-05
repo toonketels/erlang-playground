@@ -15,8 +15,12 @@ ask(Question) ->
 % Application callbacks
 %
 
-
+% Normal app start
 start(normal, []) ->
+    m8ball_sup:start_link();
+% Needed to run our app as a distributed otp app.
+% We describe how the takeover node should be started.
+start({takeover, _OtherNode}, []) ->
     m8ball_sup:start_link().
 
 stop(_State) ->
