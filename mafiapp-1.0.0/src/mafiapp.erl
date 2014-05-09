@@ -1,5 +1,6 @@
 -module(mafiapp).
 -behaviour(application).
+-include_lib("stdlib/include/ms_transform.hrl").
 -export([install/1, add_friend/4,add_service/4,friend_by_name/1]).
 -export([start/2, stop/1]).
 
@@ -70,9 +71,17 @@ friend_by_name(Name) ->
 
 
 % Returns all the services the person was involed in (from, to)...
-find_services(_Name) ->
-    % Dummy implementation, just to make it pass...
-    undefined.
+find_services(Name) ->
+    Match = ets:fun2ms(
+            fun(#mafiapp_services{from=From, to=To, date=D, description=Desc})
+                when From =:= Name ->
+                    {to, To, D, Desc};
+               (#mafiapp_services{from=From, to=To, date=D, description=Desc})
+                when To =:= Name ->
+                    {from, From, D, Desc}
+            end
+    ),
+    mnesia:select(mafiapp_services, Match).
 
 
 %

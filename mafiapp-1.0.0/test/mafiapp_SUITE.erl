@@ -3,10 +3,10 @@
 -export([init_per_suite/1,end_per_suite/1,
           init_per_testcase/2,end_per_testcase/2,
           all/0]).
--export([add_service/1,friend_by_name/1]).
+-export([add_service/1,friend_by_name/1,friend_with_services/1]).
 
 % Run all tests
-all() -> [add_service,friend_by_name].
+all() -> [add_service,friend_by_name, friend_with_services].
 
 
 % Sets everything up to run the applciation
@@ -61,3 +61,20 @@ friend_by_name(_Config) ->
     {"Pete Cityshend", _Contact, _Info, music, _Services} = mafiapp:friend_by_name("Pete Cityshend"),
     % Use a ref for some random name that does not exist.
     undefined = mafiapp:friend_by_name(make_ref()).
+
+
+friend_with_services(_Config) ->
+    ok = mafiapp:add_friend("Someone", [{other, "at the fruit stand"}],
+                            [weird, mysterious], shadiness),
+    ok = mafiapp:add_service("Don Corleone", "Someone",
+                             {1949,2,14}, "Increased business"),
+    ok = mafiapp:add_service("Someone", "Don Corleone",
+                             {1949,12,25}, "Gave a Christmas gift"),
+    %% We don't care about the order. The test was made to fit
+    %% whatever the functions returned.
+    {"Someone",
+      _Contact,
+      _Info,
+      shadiness,
+      [{from,"Don Corleone",{1949,2,14},"Increased business"},
+       {to,"Don Corleone",{1949,12,25},"Gave a Christmas gift"}]} = mafiapp:friend_by_name("Someone").
