@@ -1,7 +1,7 @@
 -module(mafiapp).
 -behaviour(application).
 -include_lib("stdlib/include/ms_transform.hrl").
--export([install/1, add_friend/4,add_service/4,friend_by_name/1]).
+-export([install/1, add_friend/4,add_service/4,friend_by_name/1,friend_by_expertise/1]).
 -export([start/2, stop/1]).
 
 -record(mafiapp_friends, {name, contact=[], info=[], expertise}).
@@ -82,6 +82,17 @@ find_services(Name) ->
             end
     ),
     mnesia:select(mafiapp_services, Match).
+
+
+friend_by_expertise(Expertise) ->
+    Pattern = #mafiapp_friends{_='_', expertise=Expertise},
+    F = fun() ->
+        Res = mnesia:match_object(Pattern),
+        % We "list comprehend" to return a tuple with as last item the services
+        % find for that person.
+        [{Name, C, I, Expertise, find_services(Name)} || #mafiapp_friends{name=Name, contact=C, info=I} <- Res]
+    end,
+    mnesia:activity(transaction, F).
 
 
 %
