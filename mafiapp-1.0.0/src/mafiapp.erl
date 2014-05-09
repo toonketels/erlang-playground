@@ -2,10 +2,12 @@
 -behaviour(application).
 -include_lib("stdlib/include/ms_transform.hrl").
 -export([install/1, add_friend/4,add_service/4,friend_by_name/1,friend_by_expertise/1,debts/1]).
+-export([find_enemy/1,add_enemy/2,enemy_killed/1]).
 -export([start/2, stop/1]).
 
 -record(mafiapp_friends, {name, contact=[], info=[], expertise}).
 -record(mafiapp_services, {from, to, date, description}).
+-record(mafiapp_enemies, {name, info=[]}).
 
 % Specifies db schema to be installed on all the given nodes.
 % Mnesia needs to be running to create the schema so we start/stop it.
@@ -28,6 +30,13 @@ install(Nodes) ->
          % See ETP for table types, almost all (but one) ETP types are supported.
          % We need bag because mulitple services can have the same from,to fields
          {type, bag}]),
+    mnesia:create_table(mafiapp_enemies,
+        [{attributes, record_info(fields, mafiapp_enemies)},
+         {index, [#mafiapp_services.to]},
+         {disc_copies, Nodes},
+         % Keep this tables content private to this node
+         % (each node has its own content)
+         {local_content, true}]),
     % On every node do: `application:stop(mnesia)`
     rpc:multicall(Nodes, application, stop, [mnesia]).
 
@@ -119,13 +128,39 @@ debts(Name) ->
     % Converts the dictionary to a list and sorts it
     lists:sort([{V,K} || {K,V} <- dict:to_list(Dict)]).
 
+find_enemy(Name) ->
+    F = fun() ->
+        mnesia:read(mafiapp_enemies, Name)
+    end,
+    % We dont just return the result of the transaction because we dont want to
+    % return lists but just a tuple or undefined.
+    case mnesia:activity(transaction, F) of
+        [] -> undefined;
+        [#mafiapp_enemies{name=N,info=I}] -> {N,I}
+    end.
+
+add_enemy(Name, Info) ->
+    F = fun() ->
+        mnesia:write(#mafiapp_enemies{name=Name,info=Info})
+    end,
+    mnesia:activity(transaction, F).
+
+enemy_killed(Name) ->
+    F = fun() ->
+        mnesia:delete({mafiapp_enemies, Name})
+    end,
+    mnesia:activity(transaction, F).
+
+
+
+
 %
 % Application callbacks.
 %
 
 start(normal, []) ->
     % We start our app once mnesia has loaded all tables from disk/created tables
-    mnesia:wait_for_tables([mafiapp_friends, mafiapp_services], 5000),
-    mafiapp_sup:start_link().
+    % mnesia:wait_for_tables([mafiapp_friends, mafiapp_services], 5000),
+    mafiapp_sup:start_link([mafiapp_friends, mafiapp_services, mafiapp_enemies]).
 
 stop(_) -> ok.
