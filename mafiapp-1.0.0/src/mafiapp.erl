@@ -1,7 +1,7 @@
 -module(mafiapp).
 -behaviour(application).
 -include_lib("stdlib/include/ms_transform.hrl").
--export([install/1, add_friend/4,add_service/4,friend_by_name/1,friend_by_expertise/1]).
+-export([install/1, add_friend/4,add_service/4,friend_by_name/1,friend_by_expertise/1,debts/1]).
 -export([start/2, stop/1]).
 
 -record(mafiapp_friends, {name, contact=[], info=[], expertise}).
@@ -94,6 +94,30 @@ friend_by_expertise(Expertise) ->
     end,
     mnesia:activity(transaction, F).
 
+% Generates a list with all the other people performed services to or received
+% services from and the amount, negative means they owe us, positive means we owe
+% them
+debts(Name) ->
+    % Get the record out of the db, we record the other ones name, -1 if they owe us,
+    % 1 if we owe them.
+    Match = ets:fun2ms(
+        fun(#mafiapp_services{from=From,to=To}) when From =:= Name -> {To, -1};
+           (#mafiapp_services{from=From,to=To}) when To =:= Name -> {From, 1}
+        end),
+    % Function to actually perform the match on the db
+    F = fun() -> mnesia:select(mafiapp_services, Match) end,
+    % Fold function aggregates the values of a list, it creates a dictionary
+    % with the count of all we owe/they owe us per person
+    FoldF = fun({Person, N}, Dict) ->
+        dict:update(Person, fun(X) -> X + N end, N, Dict)
+    end,
+    % We create the dictionary via folding over the return value of executing
+    % the transaction of the db (which returns a list)
+    Dict = lists:foldl(FoldF,
+                      dict:new(),
+                      mnesia:activity(transaction, F)),
+    % Converts the dictionary to a list and sorts it
+    lists:sort([{V,K} || {K,V} <- dict:to_list(Dict)]).
 
 %
 % Application callbacks.
