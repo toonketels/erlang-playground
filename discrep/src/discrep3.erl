@@ -3,6 +3,8 @@
 
 run() ->
     Tup = money(5, you),
+    % dializer wont catch this error...
+    % We use type annotation in discrep4 to make it catch it.
     some_op(item(amount, Tup), item(account, Tup)).
 
 money(Amount, Name) -> {give, Amount, Name}.
